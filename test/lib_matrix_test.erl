@@ -64,7 +64,7 @@ column_and_row_test_() ->
                    <<0:1, 1:1, 0:1, 1:1, 0:1>>)
     ].
 
-add_all_test_() ->
+add_test_() ->
     Init = lib_matrix:new(10, 10, ?INT8, lists:seq(1, 10 * 10)),
     Init2 = lib_matrix:new(10, 10, ?INT64, 
                            lists:seq(1000000, 1000000 + 10 * 10 - 1)),
@@ -74,11 +74,11 @@ add_all_test_() ->
                             unit = ?INT8,
                             data = <<<<I:?INT8>> || I <- lists:seq(1, 100)>>
                            }),
-     ?_assertEqual(lib_matrix:add_all(1, Init), 
+     ?_assertEqual(lib_matrix:add(1, Init), 
                    Init#matrix{
                      data = <<<<I:?INT8>> || I <- lists:seq(2, 101)>>
                     }),
-     ?_assertEqual(lib_matrix:add_all(200, Init2),
+     ?_assertEqual(lib_matrix:add(200, Init2),
                    Init2#matrix{
                      data = <<<<I:?INT64>> || 
                                 I <- lists:seq(1000200,

@@ -16,7 +16,6 @@
          column/2,
          row/2,
 
-         add_all/2,
          add/2]).
 
 -include("define_matrix.hrl").
@@ -111,17 +110,17 @@ row(RowIndex, #matrix{
     end.
 
 %% @doc add for all element in matrix
--spec add_all(integer(), #matrix{}) -> #matrix{}.
-add_all(Scalar, #matrix{
-                   unit = Unit,
-                   data = Original
-                  } = Matrix) when is_integer(Scalar) ->
+-spec add(integer(), #matrix{}) -> 
+                 #matrix{};
+         (#matrix{}, #matrix{}) ->
+                 #matrix{}.
+add(Scalar, #matrix{
+               unit = Unit,
+               data = Original
+              } = Matrix) when is_integer(Scalar) ->
     Matrix#matrix{
       data = << <<(X + Scalar):Unit>> || <<X:Unit>> <= Original>>
-     }.
-
-%% @doc ordinary matrix addition.
--spec add(#matrix{}, #matrix{}) -> #matrix{}.
+     };
 add(#matrix{
        column = Column,
        row = Row,

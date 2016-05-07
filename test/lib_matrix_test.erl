@@ -68,6 +68,11 @@ add_test_() ->
     Init = lib_matrix:new(10, 10, ?INT8, lists:seq(1, 10 * 10)),
     Init2 = lib_matrix:new(10, 10, ?INT64, 
                            lists:seq(1000000, 1000000 + 10 * 10 - 1)),
+    InitPlus = lib_matrix:new(10, 10, ?INT8, 
+                              lists:map(fun (Id) ->
+                                                Id * 2
+                                        end,
+                                        lists:seq(1, 10 * 10))),
     [?_assertEqual(Init, #matrix{
                             column = 10,
                             row = 10,
@@ -83,5 +88,7 @@ add_test_() ->
                      data = <<<<I:?INT64>> || 
                                 I <- lists:seq(1000200,
                                                1000200 + 10 * 10 - 1)>>
-                    })].
+                    }),
+     ?_assertEqual(lib_matrix:add(Init, Init), InitPlus)
+    ].
 

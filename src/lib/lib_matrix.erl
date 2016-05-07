@@ -16,9 +16,17 @@
          column/2,
          row/2,
 
-         add/2]).
+         add/2,
+         zipwith/3
+        ]).
 
 -include("define_matrix.hrl").
+
+
+
+%%%===================================================================
+%%% API
+%%%===================================================================
 
 %% @doc 
 -spec new(pos_integer(), pos_integer(), pos_integer(), list()) ->
@@ -81,14 +89,12 @@ column(ColumnIndex, #matrix{
 %% @doc The vector representing the row at the given index.
 -spec row(pos_integer(), #matrix{}) -> [integer()].
 row(RowIndex, #matrix{
-                 row = Rows,
-                 data = Data
+                 row = Rows
                 })
   when RowIndex > Rows orelse RowIndex < 1 ->
     throw(out_of_row);
 row(RowIndex, #matrix{
                  column = Columns,
-                 row = Rows,
                  unit = Unit,
                  data = Data
                 }) ->
@@ -121,27 +127,33 @@ add(Scalar, #matrix{
     Matrix#matrix{
       data = << <<(X + Scalar):Unit>> || <<X:Unit>> <= Original>>
      };
-add(#matrix{
-       column = Column,
-       row = Row,
-       unit = Unit,
-       data = Add
-      }, #matrix{
-            column = Column,
-            row = Row,
-            unit = Unit,
-            data = Original
-           } = Matrix) ->
+add(#matrix{} = MatrixA, #matrix{} = MatrixB) ->
     %% matrix with same Column, Row and Unit can be added.
-    Matrix#matrix{
-      data = <<>>
-     };
+    zipwith(fun (A, B) ->
+                    A + B
+            end, MatrixA, MatrixB);
 add(_, _) ->
     throw(not_match_matrix).
 
-%%%===================================================================
-%%% API
-%%%===================================================================
+%% @doc iterate matrix
+-spec zipwith(fun(), #matrix{}, #matrix{}) ->
+                     #matrix{}.
+zipwith(Fun, #matrix{
+                column = Columns,
+                row = Rows,
+                unit = Unit,
+                data = BinDataA
+               }, #matrix{
+                     column = Columns,
+                     row = Rows,
+                     unit = Unit,
+                     data = BinDataB
+                    } = Matrix) ->
+    Matrix#matrix{
+      data = inner_zipwith(Fun, Unit, BinDataA, BinDataB)
+     };
+zipwith(_, _, _) ->
+    throw(not_match_matrix).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -170,4 +182,14 @@ inner_filter_binary(Index, Unit, Fun, BitString) ->
         false ->
             <<(inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>
     end.
+
+%% @doc zipwith for bitstring
+-spec inner_zipwith(fun(), pos_integer(), bitstring(), bitstring()) ->
+                           bitstring().
+inner_zipwith(_, _, <<>>, <<>>) ->
+    <<>>;
+inner_zipwith(Fun, Unit, BinA, BinB) ->
+    <<A:Unit, ARest/bits>> = BinA,
+    <<B:Unit, BRest/bits>> = BinB,
+    <<(Fun(A, B)):Unit, (inner_zipwith(Fun, Unit, ARest, BRest))/bits>>.
 

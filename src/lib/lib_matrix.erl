@@ -17,7 +17,10 @@
          row/2,
 
          add/2,
-         zipwith/3
+         all/2,
+         zipwith/3,
+
+         insert_row/3
         ]).
 
 -include("define_matrix.hrl").
@@ -135,8 +138,19 @@ add(#matrix{} = MatrixA, #matrix{} = MatrixB) ->
 add(_, _) ->
     throw(not_match_matrix).
 
+%% @doc 
+-spec all(fun ((integer()) -> boolean()),
+          #matrix{}) ->
+                 boolean().
+all(Pred, #matrix{
+             unit = Unit,
+             data = Bin
+            }) ->
+    inner_all(Pred, Unit, Bin).
+
 %% @doc iterate matrix
--spec zipwith(fun(), #matrix{}, #matrix{}) ->
+-spec zipwith(fun((integer(), integer()) -> integer()), 
+              #matrix{}, #matrix{}) ->
                      #matrix{}.
 zipwith(Fun, #matrix{
                 column = Columns,
@@ -154,6 +168,34 @@ zipwith(Fun, #matrix{
      };
 zipwith(_, _, _) ->
     throw(not_match_matrix).
+
+-spec insert_row(pos_integer(), list(), #matrix{}) ->
+                        #matrix{}.
+insert_row(RowIndex, List, #matrix{
+                              column = Columns,
+                              row = Rows,
+                              unit = Unit,
+                              data = Bin
+                             } = Matrix) when is_list(List),
+                                              length(List) =:= Columns ->
+    InsertBin = <<<<I:Unit>> || I <- List>>,
+    NewBin = if
+                 RowIndex =:= 0 ->
+                     <<InsertBin/bits, Bin/bits>>;
+                 RowIndex =:= undefined;
+                 RowIndex >= Rows ->
+                     <<Bin/bits, InsertBin/bits>>;
+                 true ->
+                     HeadLength = RowIndex * Columns * Unit,
+                     <<Head:HeadLength, Rest/bits>> = Bin,
+                     <<Head:HeadLength, InsertBin/bits, Rest/bits>>
+             end,
+    Matrix#matrix{
+      row = Rows + 1,
+      data = NewBin
+     };
+insert_row(_, _, _) ->
+    throw(not_match_columns).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -184,7 +226,8 @@ inner_filter_binary(Index, Unit, Fun, BitString) ->
     end.
 
 %% @doc zipwith for bitstring
--spec inner_zipwith(fun(), pos_integer(), bitstring(), bitstring()) ->
+-spec inner_zipwith(fun((integer(), integer()) -> integer()), 
+                    pos_integer(), bitstring(), bitstring()) ->
                            bitstring().
 inner_zipwith(_, _, <<>>, <<>>) ->
     <<>>;
@@ -193,3 +236,16 @@ inner_zipwith(Fun, Unit, BinA, BinB) ->
     <<B:Unit, BRest/bits>> = BinB,
     <<(Fun(A, B)):Unit, (inner_zipwith(Fun, Unit, ARest, BRest))/bits>>.
 
+-spec inner_all(fun ((integer()) -> boolean()), pos_integer(), #matrix{}) ->
+                       boolean().
+inner_all(_, _, <<>>) ->
+    true;
+inner_all(Fun, Unit, Bin) ->
+    <<V:Unit, Rest/bits>> = Bin,
+    case Fun(V) of
+        true ->
+            inner_all(Fun, Unit, Rest);
+        false ->
+            false
+    end.
+    

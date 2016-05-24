@@ -91,23 +91,17 @@ add_mult_test_() ->
                             column = 10,
                             row = 10,
                             unit = ?INT8,
-                            data = <<<<I:?INT8>> || I <- lists:seq(1, 100)>>,
-                            min = 1,
-                            max = 100
+                            data = <<<<I:?INT8>> || I <- lists:seq(1, 100)>>
                            }),
      ?_assertEqual(lib_matrix:add(1, Init), 
                    Init#matrix{
-                     data = <<<<I:?INT8>> || I <- lists:seq(2, 101)>>,
-                     min = 2,
-                     max = 101
+                     data = <<<<I:?INT8>> || I <- lists:seq(2, 101)>>
                     }),
      ?_assertEqual(lib_matrix:add(200, Init2),
                    Init2#matrix{
                      data = <<<<I:?INT64>> || 
                                 I <- lists:seq(1000200,
-                                               1000200 + 10 * 10 - 1)>>,
-                     min = 1000200,
-                     max = 1000200 + 10 * 10 - 1
+                                               1000200 + 10 * 10 - 1)>>
                     }),
      ?_assertEqual(lib_matrix:add(Init, Init), InitPlus),
      ?_assertEqual(lib_matrix:mult(2, Init), InitPlus)
@@ -169,6 +163,25 @@ insert_column_test_() ->
                                    91, 92, 93, 99, 94, 95, 96, 97, 98
                                   ]))
     ].
+
+hungarian_reduction_test_() ->
+    List = [1, 2, 3, 4,
+            3, 3, 4, 4,
+            6, 2, 4, 1,
+            7, 9, 9, 7],
+    %% 1 2 3 4    0 1 2 3    0 1 1 3
+    %% 3 3 4 4    0 0 1 1    0 0 0 1
+    %% 6 2 4 1 -> 5 1 3 0 -> 5 1 2 0
+    %% 7 9 9 7    0 2 2 0    0 2 1 0
+    List2 = [0, 1, 1, 3,
+             0, 0, 0, 1,
+             5, 1, 2, 0,
+             0, 2, 1, 0],
+    Init = lib_matrix:new(4, 4, ?INT16, List),
+    [?_assertEqual(lib_matrix:hungarian_reduction(Init),
+                   lib_matrix:new(4, 4, ?INT16, List2))].
+
+%% ============================== for inner ==============================
 
 inner_column_list(Delta) ->
     lists:seq(1, Delta) ++ lists:seq(11, Delta + 10) ++ 

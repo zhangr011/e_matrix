@@ -22,7 +22,9 @@
          zipwith/3,
 
          insert_row/3,
-         insert_column/3
+         insert_column/3,
+         
+         hungarian_reduction/1
         ]).
 
 -include("define_matrix.hrl").
@@ -37,14 +39,11 @@
 -spec new(pos_integer(), pos_integer(), pos_integer(), list()) ->
                  #matrix{}.
 new(Row, Column, Unit, List) when Column * Row =:= length(List) ->
-    {Min, Max} = inner_min_max_of_lists(List),
     #matrix{
        column = Column,
        row = Row,
        unit = Unit,
-       data = << <<D:Unit>> || D <- List >>,
-       min = Min,
-       max = Max
+       data = << <<D:Unit>> || D <- List >>
       };
 new(_, _, _, _) ->
     throw(error_bad_length).
@@ -125,14 +124,10 @@ row(RowIndex, #matrix{
                  #matrix{}.
 add(Scalar, #matrix{
                unit = Unit,
-               data = Original,
-               min = Min,
-               max = Max
+               data = Original
               } = Matrix) when is_integer(Scalar) ->
     Matrix#matrix{
-      data = << <<(X + Scalar):Unit>> || <<X:Unit>> <= Original>>,
-      min = Min + Scalar,
-      max = Max + Scalar
+      data = << <<(X + Scalar):Unit>> || <<X:Unit>> <= Original>>
      };
 add(#matrix{} = MatrixA, #matrix{} = MatrixB) ->
     %% matrix with same Column, Row and Unit can be added.
@@ -149,14 +144,10 @@ add(_, _) ->
                   #matrix{}.
 mult(Scalar, #matrix{
                 unit = Unit,
-                data = Original,
-                min = Min,
-                max = Max
+                data = Original
                } = Matrix) when is_integer(Scalar) ->
     Matrix#matrix{
-      data = <<<<(X * Scalar):Unit>> || <<X:Unit>> <= Original>>,
-      min = Min * Scalar,
-      max = Max * Scalar
+      data = <<<<(X * Scalar):Unit>> || <<X:Unit>> <= Original>>
      };
 mult(#matrix{
         %% column = Columns,
@@ -198,12 +189,8 @@ zipwith(Fun, #matrix{
                      unit = Unit,
                      data = BinDataB
                     } = Matrix) ->
-    NewBinData = inner_zipwith(Fun, Unit, BinDataA, BinDataB),
-    {Min, Max} = inner_min_max_of_binary(Unit, NewBinData),
     Matrix#matrix{
-      data = NewBinData,
-      min = Min,
-      max = Max
+      data = inner_zipwith(Fun, Unit, BinDataA, BinDataB)
      };
 zipwith(_, _, _) ->
     throw(not_match_matrix).
@@ -215,9 +202,7 @@ insert_row(RowIndex, List, #matrix{
                               column = Columns,
                               row = Rows,
                               unit = Unit,
-                              data = Bin,
-                              min = Min,
-                              max = Max
+                              data = Bin
                              } = Matrix) when is_list(List),
                                               length(List) =:= Columns ->
     InsertBin = <<<<I:Unit>> || I <- List>>,
@@ -232,12 +217,9 @@ insert_row(RowIndex, List, #matrix{
                      <<Head:HeadLength, Rest/bits>> = Bin,
                      <<Head:HeadLength, InsertBin/bits, Rest/bits>>
              end,
-    {RowMin, RowMax} = inner_min_max_of_lists(List),
     Matrix#matrix{
       row = Rows + 1,
-      data = NewBin,
-      min = min(Min, RowMin),
-      max = max(Max, RowMax)
+      data = NewBin
      };
 insert_row(_, _, _) ->
     throw(not_match_columns).
@@ -249,9 +231,7 @@ insert_column(ColumnIndex, List, #matrix{
                                     column = Columns,
                                     row = Rows,
                                     unit = Unit,
-                                    data = Bin,
-                                    min = Min,
-                                    max = Max
+                                    data = Bin
                                    } = Matrix) when is_list(List),
                                                     length(List) =:= Rows ->
     FixedColumnIndex = if
@@ -264,15 +244,28 @@ insert_column(ColumnIndex, List, #matrix{
                                ColumnIndex
                        end,
     NewBin = inner_insert_column(FixedColumnIndex, Columns, Unit, Bin, List),
-    {ColumnMin, ColumnMax} = inner_min_max_of_lists(List),
     Matrix#matrix{
       column = Columns + 1,
-      data = NewBin,
-      min = min(Min, ColumnMin),
-      max = max(Max, ColumnMax)
+      data = NewBin
      };
 insert_column(_, _, _) ->
     throw(not_match_rows).
+
+%% @doc reduction matrix for hungarian algorithm, that is
+%% 1 2  3    0 1 2    0 0 0      2 1 1    1 0 0    - - 3
+%% 4 6  8 -> 0 2 4 -> 0 1 2 ( -> 1 1 2 -> 0 0 1 -> - 6 - )
+%% 7 10 13   0 3 6    0 2 4      1 2 4    0 1 2    7 - -
+%% for more: https://www.topcoder.com/community/data-science/data-science-tutorials/assignment-problem-and-hungarian-algorithm/
+-spec hungarian_reduction(Matrix :: #matrix{}) ->
+                                 #matrix{}.
+hungarian_reduction(#matrix{
+                       row = Same,
+                       column = Same
+                      } = Matrix) ->
+    RowReduction = inner_row_hungarian_reduction(Matrix),
+    inner_column_hungarian_reduction(RowReduction);
+hungarian_reduction(_) ->
+    throw(not_square_matrix).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -361,37 +354,105 @@ inner_plus_columns(Index, Columns) ->
             Next
     end.
 
--spec inner_min_max_of_lists(list()) ->
-                                    {pos_integer(), pos_integer()}.
-inner_min_max_of_lists([Head | Tail]) ->
-    inner_min_max_of_lists(Head, Head, Tail).
-inner_min_max_of_lists(Min, Max, []) ->
-    {Min, Max};
-inner_min_max_of_lists(Min, Max, [Head | Tail]) ->
-    if
-        Head < Min ->
-            inner_min_max_of_lists(Head, Max, Tail);
-        Head > Max ->
-            inner_min_max_of_lists(Min, Head, Tail);
-        true ->
-            inner_min_max_of_lists(Min, Max, Tail)
-    end.
+%% @doc row reduction for hungarian
+%% 1 2 3    0 1 2
+%% 3 1 5 -> 2 0 4
+%% 1 4 7    0 3 6
+-spec inner_row_hungarian_reduction(#matrix{}) ->
+                                           #matrix{}.
+inner_row_hungarian_reduction(#matrix{
+                                 column = Column,
+                                 unit = Unit,
+                                 data = Bin
+                                } = Matrix) ->
+    Matrix#matrix{
+      data = inner_row_hungarian_reduction(Column, Unit, Bin)
+     }.
 
--spec inner_min_max_of_binary(pos_integer(), bitstring()) ->
-                                     {pos_integer(), pos_integer()}.
-inner_min_max_of_binary(Unit, BinData) ->
+inner_row_hungarian_reduction(Unit, Bin) ->
+    %% find the min at first
+    Min = inner_min(Unit, Bin),
+    %% all minus the minimum
+    <<<<(Value - Min):Unit>> || <<Value:Unit>> <= Bin>>.
+
+inner_row_hungarian_reduction(_, _, <<>>) ->
+    <<>>;
+inner_row_hungarian_reduction(Column, Unit, Bin) ->
+    Size = Unit * Column,
+    <<BinRow:Size, Tail/bits>> = Bin,
+    <<(inner_row_hungarian_reduction(Unit, <<BinRow:Size>>))/bits, 
+      (inner_row_hungarian_reduction(Column, Unit, Tail))/bits>>.
+
+%% @doc column reduction for hungarian
+%% 0 1 2    0 1 0
+%% 2 0 4 -> 2 0 2
+%% 0 3 2    0 3 0
+-spec inner_column_hungarian_reduction(#matrix{}) ->
+                                              #matrix{}.
+inner_column_hungarian_reduction(#matrix{
+                                    column = Column,
+                                    unit = Unit,
+                                    data = Bin
+                                   } = Matrix) ->
+    Matrix#matrix{
+      data = inner_column_hungarian_reduction(Column, Unit, Bin)
+     }.
+
+inner_column_hungarian_reduction(Column, Unit, Bin) ->
+    BinMin = inner_min(Column, Unit, Bin),
+    Size = Unit * Column,
+    <<<<(inner_zipwith(fun (ValueA, ValueB) -> 
+                               ValueA - ValueB
+                       end, Unit, <<BinRow:Size>>, BinMin))/bits>> 
+      || <<BinRow:Size>> <= Bin>>.
+
+%% -spec inner_min_max_of_lists(list()) ->
+%%                                     {pos_integer(), pos_integer()}.
+%% inner_min_max_of_lists([Head | Tail]) ->
+%%     inner_min_max_of_lists(Head, Head, Tail).
+%% inner_min_max_of_lists(Min, Max, []) ->
+%%     {Min, Max};
+%% inner_min_max_of_lists(Min, Max, [Head | Tail]) ->
+%%     if
+%%         Head < Min ->
+%%             inner_min_max_of_lists(Head, Max, Tail);
+%%         Head > Max ->
+%%             inner_min_max_of_lists(Min, Head, Tail);
+%%         true ->
+%%             inner_min_max_of_lists(Min, Max, Tail)
+%%     end.
+
+-spec inner_min(Column :: pos_integer(), Unit :: pos_integer(),
+                Bin :: bitstring()) ->
+                       bitstring().
+inner_min(Column, Unit, Bin) ->
+    Size = Unit * Column,
+    <<BinMin:Size, Tail/bits>> = Bin,
+    inner_min(Column, Unit, <<BinMin:Size>>, Tail).
+
+inner_min(_Column, _Unit, BinMin, <<>>) ->
+    BinMin;
+inner_min(Column, Unit, BinMin, Bin) ->
+    Size = Unit * Column,
+    <<BinMin2:Size, Tail/bits>> = Bin,
+    inner_min(
+      Column, Unit, 
+      inner_zipwith(fun erlang:min/2, Unit, BinMin, <<BinMin2:Size>>), Tail).
+
+-spec inner_min(Unit :: pos_integer(), BinData :: bitstring()) ->
+                       pos_integer().
+inner_min(Unit, BinData) ->
     <<Value:Unit, Tail/bits>> = BinData,
-    inner_min_max_of_binary(Value, Value, Unit, Tail).
-inner_min_max_of_binary(Min, Max, _, <<>>) ->
-    {Min, Max};
-inner_min_max_of_binary(Min, Max, Unit, BinData) ->
+    inner_min2(Value, Unit, Tail).
+
+inner_min2(Min, _, <<>>) ->
+    Min;
+inner_min2(Min, Unit, BinData) ->
     <<Head:Unit, Tail/bits>> = BinData,
     if
         Head < Min ->
-            inner_min_max_of_binary(Head, Max, Unit, Tail);
-        Head > Max ->
-            inner_min_max_of_binary(Min, Head, Unit, Tail);
+            inner_min2(Head, Unit, Tail);
         true ->
-            inner_min_max_of_binary(Min, Max, Unit, Tail)
+            inner_min2(Min, Unit, Tail)
     end.
 

@@ -50,8 +50,7 @@ new(_, _, _, _) ->
 
 %% @doc True if the matrix is square, false otherwise.
 -spec is_square(#matrix{}) -> boolean().
-is_square(#matrix{row = Rows, column = Columns})
-  when Rows =:= Columns ->
+is_square(#matrix{row = Same, column = Same}) ->
     true;
 is_square(_) ->
     false.
@@ -68,9 +67,13 @@ get(_Row, ColumnIndex, #matrix{
     throw(out_of_column);
 get(RowIndex, ColumnIndex, #matrix{
                               column = Columns,
+                              unit = Unit,
                               data = Data
                              }) ->
-    binary:at(Data, ((RowIndex - 1) * Columns + ColumnIndex - 1)).
+    Index = inner_index(RowIndex, ColumnIndex, Columns),
+    Size = Unit * Index,
+    <<_Pre:Size/bits, Value:Unit, _/bits>> = Data,
+    Value.
 
 %% @doc The vector representing the column at the given index.
 -spec column(pos_integer(), #matrix{}) -> [integer()].
@@ -286,10 +289,10 @@ inner_filter_binary(Unit, Fun, BinData) ->
 inner_filter_binary(_, _, _, <<>>) ->
     <<>>;
 inner_filter_binary(Index, Unit, Fun, BitString) ->
-    <<V:Unit, Rest/bits>> = BitString,
+    <<V:Unit/bits, Rest/bits>> = BitString,
     case Fun(Index) of
         true ->
-            <<V:Unit, 
+            <<V/bits, 
               (inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>;
         false ->
             <<(inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>
@@ -455,4 +458,11 @@ inner_min2(Min, Unit, BinData) ->
         true ->
             inner_min2(Min, Unit, Tail)
     end.
+
+-spec inner_index(RowIndex :: pos_integer(),
+                  ColumnIndex :: pos_integer(),
+                  Columns :: pos_integer()) ->
+                         pos_integer().
+inner_index(RowIndex, ColumnIndex, Columns) ->
+    (RowIndex - 1) * Columns + ColumnIndex - 1.
 

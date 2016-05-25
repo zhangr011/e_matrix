@@ -26,10 +26,21 @@ new_test_() ->
 
 get_test_() ->
     Init = lib_matrix:new(10, 5, ?INT8, lists:seq(1, 10 * 5)),
+    Init2 = lib_matrix:new(10, 5, ?INT16, lists:seq(1, 10 * 5)),
+    Init3 = lib_matrix:new(10, 5, ?INT1, lists:seq(1, 10 * 5)),
     [?_assertEqual(1, lib_matrix:get(1, 1, Init)),
      ?_assertEqual(5, lib_matrix:get(1, 5, Init)),
      ?_assertEqual(6, lib_matrix:get(2, 1, Init)),
-     ?_assertEqual(46, lib_matrix:get(10, 1, Init))].
+     ?_assertEqual(46, lib_matrix:get(10, 1, Init)),
+     ?_assertEqual(50, lib_matrix:get(10, 5, Init)),
+     ?_assertEqual(46, lib_matrix:get(10, 1, Init2)),
+     ?_assertEqual(50, lib_matrix:get(10, 5, Init2)),
+     ?_assertEqual(1, lib_matrix:get(1, 1, Init3)),
+     ?_assertEqual(1, lib_matrix:get(1, 5, Init3)),
+     ?_assertEqual(0, lib_matrix:get(2, 1, Init3)),
+     ?_assertEqual(0, lib_matrix:get(10, 1, Init3)),
+     ?_assertEqual(0, lib_matrix:get(10, 5, Init3))
+    ].
 
 is_square_test_() ->
     Square = lib_matrix:new(10, 10, ?INT8, lists:seq(1, 10 * 10)),

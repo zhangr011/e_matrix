@@ -113,8 +113,8 @@ row(RowIndex, #matrix{
         true ->
             PreIndex = (RowIndex - 1) * Columns * Unit,
             RowLength = Columns * Unit,
-            <<_Head:PreIndex, Result:RowLength, _/bits>> = Data,
-            <<Result:RowLength>>
+            <<_Head:PreIndex/bits, Result:RowLength/bits, _/bits>> = Data,
+            Result
     end.
 
 %% @doc add for all element in matrix
@@ -214,8 +214,8 @@ insert_row(RowIndex, List, #matrix{
                      <<Bin/bits, InsertBin/bits>>;
                  true ->
                      HeadLength = RowIndex * Columns * Unit,
-                     <<Head:HeadLength, Rest/bits>> = Bin,
-                     <<Head:HeadLength, InsertBin/bits, Rest/bits>>
+                     <<Head:HeadLength/bits, Rest/bits>> = Bin,
+                     <<Head/bits, InsertBin/bits, Rest/bits>>
              end,
     Matrix#matrix{
       row = Rows + 1,
@@ -339,9 +339,9 @@ inner_insert_column(IIndex, Columns, Unit, PreData, Data, Index,
               IIndex, Columns, Unit, <<PreData/bits, Head:Unit>>, Data, 
               inner_plus_columns(Index, Columns), Tail);
         false ->
-            <<Value:Unit, Left/bits>> = Data,
+            <<Value:Unit/bits, Left/bits>> = Data,
             inner_insert_column(
-              IIndex, Columns, Unit, <<PreData/bits, Value:Unit>>, Left,
+              IIndex, Columns, Unit, <<PreData/bits, Value/bits>>, Left,
               inner_plus_columns(Index, Columns), List)
     end.
 
@@ -379,8 +379,8 @@ inner_row_hungarian_reduction(_, _, <<>>) ->
     <<>>;
 inner_row_hungarian_reduction(Column, Unit, Bin) ->
     Size = Unit * Column,
-    <<BinRow:Size, Tail/bits>> = Bin,
-    <<(inner_row_hungarian_reduction(Unit, <<BinRow:Size>>))/bits, 
+    <<BinRow:Size/bits, Tail/bits>> = Bin,
+    <<(inner_row_hungarian_reduction(Unit, BinRow))/bits, 
       (inner_row_hungarian_reduction(Column, Unit, Tail))/bits>>.
 
 %% @doc column reduction for hungarian
@@ -403,8 +403,8 @@ inner_column_hungarian_reduction(Column, Unit, Bin) ->
     Size = Unit * Column,
     <<<<(inner_zipwith(fun (ValueA, ValueB) -> 
                                ValueA - ValueB
-                       end, Unit, <<BinRow:Size>>, BinMin))/bits>> 
-      || <<BinRow:Size>> <= Bin>>.
+                       end, Unit, BinRow, BinMin))/bits>> 
+      || <<BinRow:Size/bits>> <= Bin>>.
 
 %% -spec inner_min_max_of_lists(list()) ->
 %%                                     {pos_integer(), pos_integer()}.
@@ -427,17 +427,17 @@ inner_column_hungarian_reduction(Column, Unit, Bin) ->
                        bitstring().
 inner_min(Column, Unit, Bin) ->
     Size = Unit * Column,
-    <<BinMin:Size, Tail/bits>> = Bin,
-    inner_min(Column, Unit, <<BinMin:Size>>, Tail).
+    <<BinMin:Size/bits, Tail/bits>> = Bin,
+    inner_min(Column, Unit, BinMin, Tail).
 
 inner_min(_Column, _Unit, BinMin, <<>>) ->
     BinMin;
 inner_min(Column, Unit, BinMin, Bin) ->
     Size = Unit * Column,
-    <<BinMin2:Size, Tail/bits>> = Bin,
+    <<BinMin2:Size/bits, Tail/bits>> = Bin,
     inner_min(
       Column, Unit, 
-      inner_zipwith(fun erlang:min/2, Unit, BinMin, <<BinMin2:Size>>), Tail).
+      inner_zipwith(fun erlang:min/2, Unit, BinMin, BinMin2), Tail).
 
 -spec inner_min(Unit :: pos_integer(), BinData :: bitstring()) ->
                        pos_integer().

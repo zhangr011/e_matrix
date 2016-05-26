@@ -24,7 +24,9 @@
          insert_row/3,
          insert_column/3,
          
-         hungarian_reduction/1
+         hungarian_reduction/1,
+         
+         column_max/1, column_max/2
         ]).
 
 -include("define_matrix.hrl").
@@ -193,7 +195,7 @@ zipwith(Fun, #matrix{
                      data = BinDataB
                     } = Matrix) ->
     Matrix#matrix{
-      data = inner_zipwith(Fun, Unit, BinDataA, BinDataB)
+      data = lib_bitstring:zipwith(Fun, Unit, BinDataA, BinDataB)
      };
 zipwith(_, _, _) ->
     throw(not_match_matrix).
@@ -270,6 +272,27 @@ hungarian_reduction(#matrix{
 hungarian_reduction(_) ->
     throw(not_square_matrix).
 
+%% @doc return the max of each column
+-spec column_max(Input :: bitstring(),
+                 Matrix :: #matrix{}) ->
+                        #matrix{}.
+column_max(Input, #matrix{
+                     column = Columns,
+                     unit = Unit,
+                     data = Data
+                    }) ->
+    Size = Unit * Columns,
+    inner_column_max(Input, Unit, Size, Data).
+
+-spec column_max(Matrix :: #matrix{}) ->
+                        #matrix{}.
+column_max(#matrix{
+              column = Columns,
+              unit = Unit
+             } = Matrix) ->
+    Input = << <<Value:Unit>> || Value <- lists:duplicate(Columns, 0) >>, 
+    column_max(Input, Matrix).
+
 %%--------------------------------------------------------------------
 %% @doc
 %% @spec
@@ -297,17 +320,6 @@ inner_filter_binary(Index, Unit, Fun, BitString) ->
         false ->
             <<(inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>
     end.
-
-%% @doc zipwith for bitstring
--spec inner_zipwith(fun((integer(), integer()) -> integer()), 
-                    pos_integer(), bitstring(), bitstring()) ->
-                           bitstring().
-inner_zipwith(_, _, <<>>, <<>>) ->
-    <<>>;
-inner_zipwith(Fun, Unit, BinA, BinB) ->
-    <<A:Unit, ARest/bits>> = BinA,
-    <<B:Unit, BRest/bits>> = BinB,
-    <<(Fun(A, B)):Unit, (inner_zipwith(Fun, Unit, ARest, BRest))/bits>>.
 
 -spec inner_all(fun ((integer()) -> boolean()), pos_integer(), #matrix{}) ->
                        boolean().
@@ -404,9 +416,9 @@ inner_column_hungarian_reduction(#matrix{
 inner_column_hungarian_reduction(Column, Unit, Bin) ->
     BinMin = inner_min(Column, Unit, Bin),
     Size = Unit * Column,
-    <<<<(inner_zipwith(fun (ValueA, ValueB) -> 
-                               ValueA - ValueB
-                       end, Unit, BinRow, BinMin))/bits>> 
+    <<<<(lib_bitstring:zipwith(fun (ValueA, ValueB) -> 
+                                       ValueA - ValueB
+                               end, Unit, BinRow, BinMin))/bits>> 
       || <<BinRow:Size/bits>> <= Bin>>.
 
 %% -spec inner_min_max_of_lists(list()) ->
@@ -440,7 +452,7 @@ inner_min(Column, Unit, BinMin, Bin) ->
     <<BinMin2:Size/bits, Tail/bits>> = Bin,
     inner_min(
       Column, Unit, 
-      inner_zipwith(fun erlang:min/2, Unit, BinMin, BinMin2), Tail).
+      lib_bitstring:zipwith(fun erlang:min/2, Unit, BinMin, BinMin2), Tail).
 
 -spec inner_min(Unit :: pos_integer(), BinData :: bitstring()) ->
                        pos_integer().
@@ -465,4 +477,18 @@ inner_min2(Min, Unit, BinData) ->
                          pos_integer().
 inner_index(RowIndex, ColumnIndex, Columns) ->
     (RowIndex - 1) * Columns + ColumnIndex - 1.
+
+-include_lib("eunit/include/eunit.hrl").
+-spec inner_column_max(Current :: bitstring(),
+                       Unit :: pos_integer(),
+                       Size :: pos_integer(),
+                       Data :: bitstring()) ->
+                              bitstring().
+inner_column_max(Current, _Unit, _Size, <<>>) ->
+    Current;
+inner_column_max(Current, Unit, Size, Bin) ->
+    <<BinHead:Size/bits, Tail/bits>> = Bin,
+    inner_column_max(
+      lib_bitstring:zipwith(fun erlang:max/2, Unit, Current, BinHead),
+      Unit, Size, Tail).
 

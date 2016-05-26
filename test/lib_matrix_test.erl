@@ -192,6 +192,12 @@ hungarian_reduction_test_() ->
     [?_assertEqual(lib_matrix:hungarian_reduction(Init),
                    lib_matrix:new(4, 4, ?INT16, List2))].
 
+column_max_test_() ->
+    Init = lib_matrix:new(10, 5, ?INT16, lists:seq(1, 10 * 5)),
+    List = lists:seq(46, 50),
+    [?_assertEqual(<< <<V:?INT16>> || V <- List >>,
+                   lib_matrix:column_max(Init))].
+
 %% ============================== for inner ==============================
 
 inner_column_list(Delta) ->

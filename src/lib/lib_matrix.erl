@@ -13,6 +13,7 @@
          is_square/1,
 
          get/3,
+         set/4,
          column/2,
          row/2,
 
@@ -23,6 +24,7 @@
 
          insert_row/3,
          insert_column/3,
+         transpose/1,
 
          hungarian_reduction/1,
 
@@ -76,6 +78,50 @@ get(RowIndex, ColumnIndex, #matrix{
     Size = Unit * Index,
     <<_Pre:Size/bits, Value:Unit, _/bits>> = Data,
     Value.
+
+%% @doc set element of matrix
+-spec set(pos_integer(), pos_integer(), #matrix{}, integer()) -> #matrix{}.
+set(RowIndex, _Column, #matrix{
+  row = Rows
+}, _Value) when RowIndex > Rows orelse RowIndex < 1 ->
+  throw(out_of_row);
+set(_Row, ColumnIndex, #matrix{
+  column = Columns
+}, _Value) when ColumnIndex > Columns orelse Columns < 1 ->
+  throw(out_of_column);
+set(RowIndex, ColumnIndex, #matrix{
+  column = Columns,
+  row = Rows,
+  unit = Unit,
+  data = Data
+}, Value) ->
+  Index = inner_index(RowIndex, ColumnIndex, Columns),
+  Size = Unit * Index,
+  <<Pre:Size/bits, _Value:Unit, Suf/bits>> = Data,
+  #matrix{
+    column = Columns,
+    row = Rows,
+    unit = Unit,
+    data = <<Pre/bits, Value:Unit, Suf/bits>>
+  }.
+
+
+%% @doc Transpose of matrix
+-spec transpose(#matrix{}) -> #matrix{}.
+transpose(#matrix{column = Columns, row = Rows} = Matrix) ->
+  Indexes = case Columns =:= Rows of
+              true -> [{X, Y} || X <- lists:seq(1, Rows), Y <- lists:seq(1, Columns), X < Y];
+              false -> tl([{X, Y} || X <- lists:seq(1, Rows), Y <- lists:seq(1, Columns)])
+            end,
+  case Columns =:= Rows of
+    true -> for_each(Indexes, fun(M, I, J) -> swap(M, I, J) end, Matrix);
+    false -> copy(Matrix, Indexes,
+      #matrix{column = Rows,
+        row = Columns,
+        unit = Matrix#matrix.unit,
+        data = Matrix#matrix.data
+      })
+  end.
 
 %% @doc The vector representing the column at the given index.
 -spec column(pos_integer(), #matrix{}) -> [integer()].
@@ -485,3 +531,18 @@ inner_column_max(Current, Unit, Size, Bin) ->
       lib_bitstring:zipwith(fun erlang:max/2, Unit, Current, BinHead),
       Unit, Size, Tail).
 
+-spec for_each([{integer(), integer()}], fun((#matrix{}, integer(), integer()) -> #matrix{}),
+    #matrix{}) -> #matrix{}.
+for_each([], _Fun, Matrix) -> Matrix;
+for_each([{F, S} | T], Fun, Matrix) -> for_each(T, Fun, Fun(Matrix, F, S)).
+
+-spec swap(#matrix{}, pos_integer(), pos_integer()) -> #matrix{}.
+swap(Matrix, I, J) ->
+  A = get(I, J, Matrix),
+  B = get(J, I, Matrix),
+  Temp = set(I, J, Matrix, B),
+  set(J, I, Temp, A).
+
+-spec copy(#matrix{}, [{integer(), integer()}], #matrix{}) -> #matrix{}.
+copy(_First, [], Second) -> Second;
+copy(First, [{F, S} | T], Second) -> copy(First, T, set(S, F, Second, get(F, S, First))).

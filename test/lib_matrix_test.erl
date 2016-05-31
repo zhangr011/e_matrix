@@ -49,19 +49,19 @@ is_square_test_() ->
      ?_assertNot(lib_matrix:is_square(NoSquare))].
 
 column_and_row_test_() ->
-    Init = lib_matrix:new(10, 5, ?INT32, lists:seq(1, 10 * 5)),    
+    Init = lib_matrix:new(10, 5, ?INT32, lists:seq(1, 10 * 5)),
     Init1 = lib_matrix:new(10, 5, ?INT1, lists:seq(1, 10 * 5)),
-    [?_assertEqual(lib_matrix:column(1, Init), 
-                   <<<<I:?INT32>> || 
+    [?_assertEqual(lib_matrix:column(1, Init),
+                   <<<<I:?INT32>> ||
                        I <- [1, 6, 11, 16, 21, 26, 31, 36, 41, 46]>>),
      ?_assertEqual(lib_matrix:column(5, Init),
-                   <<<<I:?INT32>> || 
+                   <<<<I:?INT32>> ||
                        I <- [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]>>),
-     ?_assertEqual(lib_matrix:row(1, Init), 
+     ?_assertEqual(lib_matrix:row(1, Init),
                    <<<<I:?INT32>> || I <- [1, 2, 3, 4, 5]>>),
-     ?_assertEqual(lib_matrix:row(2, Init), 
+     ?_assertEqual(lib_matrix:row(2, Init),
                    <<<<I:?INT32>> || I <- [6, 7, 8, 9, 10]>>),
-     ?_assertEqual(lib_matrix:row(10, Init), 
+     ?_assertEqual(lib_matrix:row(10, Init),
                    <<<<I:?INT32>> || I <- [46, 47, 48, 49, 50]>>),
      ?_assertEqual(lib_matrix:column(1, Init1),
                    <<1:1, 0:1, 1:1, 0:1, 1:1, 0:1, 1:1, 0:1, 1:1, 0:1>>),
@@ -91,9 +91,9 @@ all_test_() ->
 
 add_mult_test_() ->
     Init = lib_matrix:new(10, 10, ?INT8, lists:seq(1, 10 * 10)),
-    Init2 = lib_matrix:new(10, 10, ?INT64, 
+    Init2 = lib_matrix:new(10, 10, ?INT64,
                            lists:seq(1000000, 1000000 + 10 * 10 - 1)),
-    InitPlus = lib_matrix:new(10, 10, ?INT8, 
+    InitPlus = lib_matrix:new(10, 10, ?INT8,
                               lists:map(fun (Id) ->
                                                 Id * 2
                                         end,
@@ -104,13 +104,13 @@ add_mult_test_() ->
                             unit = ?INT8,
                             data = <<<<I:?INT8>> || I <- lists:seq(1, 100)>>
                            }),
-     ?_assertEqual(lib_matrix:add(1, Init), 
+     ?_assertEqual(lib_matrix:add(1, Init),
                    Init#matrix{
                      data = <<<<I:?INT8>> || I <- lists:seq(2, 101)>>
                     }),
      ?_assertEqual(lib_matrix:add(200, Init2),
                    Init2#matrix{
-                     data = <<<<I:?INT64>> || 
+                     data = <<<<I:?INT64>> ||
                                 I <- lists:seq(1000200,
                                                1000200 + 10 * 10 - 1)>>
                     }),
@@ -122,14 +122,14 @@ insert_row_test_() ->
     List1 = lists:seq(1, 10 * 10),
     Init = lib_matrix:new(10, 10, ?INT16, List1),
     List2 = lists:seq(201, 210),
-    [?_assertEqual(lib_matrix:insert_row(0, List2, Init), 
+    [?_assertEqual(lib_matrix:insert_row(0, List2, Init),
                    lib_matrix:new(11, 10, ?INT16, List2 ++ List1)),
-     ?_assertEqual(lib_matrix:insert_row(undefined, List2, Init), 
+     ?_assertEqual(lib_matrix:insert_row(undefined, List2, Init),
                    lib_matrix:new(11, 10, ?INT16, List1 ++ List2)),
-     ?_assertEqual(lib_matrix:insert_row(100, List2, Init), 
+     ?_assertEqual(lib_matrix:insert_row(100, List2, Init),
                    lib_matrix:new(11, 10, ?INT16, List1 ++ List2)),
      ?_assertEqual(lib_matrix:insert_row(5, List2, Init),
-                   lib_matrix:new(11, 10, ?INT16, 
+                   lib_matrix:new(11, 10, ?INT16,
                                   lists:seq(1, 50) ++ List2  ++
                                       lists:seq(51, 100)))
     ].
@@ -148,7 +148,7 @@ insert_column_test_() ->
      ?_assertEqual(lib_matrix:insert_column(9, Lists3, Init2),
                    lib_matrix:new(10, 10, ?INT16, Lists5)),
      ?_assertEqual(lib_matrix:insert_column(0, Lists2, Init),
-                   lib_matrix:new(10, 9, ?INT16, 
+                   lib_matrix:new(10, 9, ?INT16,
                                   [9, 1, 2, 3, 4, 5, 6, 7, 8,
                                    19, 11, 12, 13, 14, 15, 16, 17, 18,
                                    29, 21, 22, 23, 24, 25, 26, 27, 28,
@@ -161,7 +161,7 @@ insert_column_test_() ->
                                    99, 91, 92, 93, 94, 95, 96, 97, 98
                                   ])),
      ?_assertEqual(lib_matrix:insert_column(3, Lists2, Init),
-                   lib_matrix:new(10, 9, ?INT16, 
+                   lib_matrix:new(10, 9, ?INT16,
                                   [1, 2, 3, 9, 4, 5, 6, 7, 8,
                                    11, 12, 13, 19, 14, 15, 16, 17, 18,
                                    21, 22, 23, 29, 24, 25, 26, 27, 28,
@@ -198,12 +198,20 @@ column_max_test_() ->
     [?_assertEqual(<< <<V:?INT16>> || V <- List >>,
                    lib_matrix:column_max(Init))].
 
+transpose_test_() ->
+  First = lib_matrix:new(10, 5, ?INT16, lists:seq(1, 10 * 5)),
+  TFirst = lib_matrix:transpose(First),
+  Second = lib_matrix:new(10, 10, ?INT16, lists:seq(1, 10 * 10)),
+  TSecond = lib_matrix:transpose(Second),
+  [?_assertEqual(First,lib_matrix:transpose(TFirst)),
+  ?_assertEqual(Second,lib_matrix:transpose(TSecond))].
+
 %% ============================== for inner ==============================
 
 inner_column_list(Delta) ->
-    lists:seq(1, Delta) ++ lists:seq(11, Delta + 10) ++ 
-        lists:seq(21, Delta + 20) ++ lists:seq(31, Delta + 30) ++ 
+    lists:seq(1, Delta) ++ lists:seq(11, Delta + 10) ++
+        lists:seq(21, Delta + 20) ++ lists:seq(31, Delta + 30) ++
         lists:seq(41, Delta + 40) ++ lists:seq(51, Delta + 50) ++
-        lists:seq(61, Delta + 60) ++ lists:seq(71, Delta + 70) ++ 
+        lists:seq(61, Delta + 60) ++ lists:seq(71, Delta + 70) ++
         lists:seq(81, Delta + 80) ++ lists:seq(91, Delta + 90).
 

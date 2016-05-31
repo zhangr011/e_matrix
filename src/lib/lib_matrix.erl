@@ -23,9 +23,9 @@
 
          insert_row/3,
          insert_column/3,
-         
+
          hungarian_reduction/1,
-         
+
          column_max/1, column_max/2
         ]).
 
@@ -37,7 +37,7 @@
 %%% API
 %%%===================================================================
 
-%% @doc 
+%% @doc
 -spec new(pos_integer(), pos_integer(), pos_integer(), list()) ->
                  #matrix{}.
 new(Row, Column, Unit, List) when Column * Row =:= length(List) ->
@@ -81,7 +81,7 @@ get(RowIndex, ColumnIndex, #matrix{
 -spec column(pos_integer(), #matrix{}) -> [integer()].
 column(ColumnIndex, #matrix{
                        column = Columns
-                      }) when ColumnIndex > Columns orelse 
+                      }) when ColumnIndex > Columns orelse
                               ColumnIndex < 1 ->
     throw(out_of_column);
 column(ColumnIndex, #matrix{
@@ -89,9 +89,9 @@ column(ColumnIndex, #matrix{
                        unit = Unit,
                        data = Data
                       }) ->
-    inner_filter_binary(Unit, 
-                        fun (Index) 
-                              when (Index - 1) rem Columns + 1 =:= 
+    inner_filter_binary(Unit,
+                        fun (Index)
+                              when (Index - 1) rem Columns + 1 =:=
                                    ColumnIndex ->
                                 true;
                             (_) ->
@@ -112,8 +112,8 @@ row(RowIndex, #matrix{
                 }) ->
     if
         Unit >= ?INT8 ->
-            binary:part(Data, 
-                        (RowIndex - 1) * Columns * Unit div ?INT8, 
+            binary:part(Data,
+                        (RowIndex - 1) * Columns * Unit div ?INT8,
                         Columns * Unit div ?INT8);
         true ->
             PreIndex = (RowIndex - 1) * Columns * Unit,
@@ -123,7 +123,7 @@ row(RowIndex, #matrix{
     end.
 
 %% @doc add for all element in matrix
--spec add(integer(), #matrix{}) -> 
+-spec add(integer(), #matrix{}) ->
                  #matrix{};
          (#matrix{}, #matrix{}) ->
                  #matrix{}.
@@ -169,7 +169,7 @@ mult(#matrix{
 mult(_, _) ->
     throw(not_match_matrix).
 
-%% @doc 
+%% @doc
 -spec all(fun ((integer()) -> boolean()),
           #matrix{}) ->
                  boolean().
@@ -180,7 +180,7 @@ all(Pred, #matrix{
     inner_all(Pred, Unit, Bin).
 
 %% @doc iterate matrix
--spec zipwith(fun((integer(), integer()) -> integer()), 
+-spec zipwith(fun((integer(), integer()) -> integer()),
               #matrix{}, #matrix{}) ->
                      #matrix{}.
 zipwith(Fun, #matrix{
@@ -290,7 +290,7 @@ column_max(#matrix{
               column = Columns,
               unit = Unit
              } = Matrix) ->
-    Input = << <<Value:Unit>> || Value <- lists:duplicate(Columns, 0) >>, 
+    Input = << <<Value:Unit>> || Value <- lists:duplicate(Columns, 0) >>,
     column_max(Input, Matrix).
 
 %%--------------------------------------------------------------------
@@ -315,7 +315,7 @@ inner_filter_binary(Index, Unit, Fun, BitString) ->
     <<V:Unit/bits, Rest/bits>> = BitString,
     case Fun(Index) of
         true ->
-            <<V/bits, 
+            <<V/bits,
               (inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>;
         false ->
             <<(inner_filter_binary(Index + 1, Unit, Fun, Rest))/bits>>
@@ -336,7 +336,7 @@ inner_all(Fun, Unit, Bin) ->
 
 -spec inner_insert_column(InsertIndex :: pos_integer(),
                           Columns :: pos_integer(),
-                          Unit :: pos_integer(), 
+                          Unit :: pos_integer(),
                           BinData :: bitstring(),
                           List :: list()) ->
                                  bitstring().
@@ -351,7 +351,7 @@ inner_insert_column(IIndex, Columns, Unit, PreData, Data, Index,
     case Index =:= IIndex of
         true ->
             inner_insert_column(
-              IIndex, Columns, Unit, <<PreData/bits, Head:Unit>>, Data, 
+              IIndex, Columns, Unit, <<PreData/bits, Head:Unit>>, Data,
               inner_plus_columns(Index, Columns), Tail);
         false ->
             <<Value:Unit/bits, Left/bits>> = Data,
@@ -360,14 +360,8 @@ inner_insert_column(IIndex, Columns, Unit, PreData, Data, Index,
               inner_plus_columns(Index, Columns), List)
     end.
 
-inner_plus_columns(Index, Columns) ->
-    Next = Index + 1,
-    if
-        Next > Columns ->
-            0;
-        true ->
-            Next
-    end.
+inner_plus_columns(Index, Columns) when Index >= Columns -> 0;
+inner_plus_columns(Index, _Columns) -> Index + 1.
 
 %% @doc row reduction for hungarian
 %% 1 2 3    0 1 2
@@ -395,7 +389,7 @@ inner_row_hungarian_reduction(_, _, <<>>) ->
 inner_row_hungarian_reduction(Column, Unit, Bin) ->
     Size = Unit * Column,
     <<BinRow:Size/bits, Tail/bits>> = Bin,
-    <<(inner_row_hungarian_reduction(Unit, BinRow))/bits, 
+    <<(inner_row_hungarian_reduction(Unit, BinRow))/bits,
       (inner_row_hungarian_reduction(Column, Unit, Tail))/bits>>.
 
 %% @doc column reduction for hungarian
@@ -416,9 +410,9 @@ inner_column_hungarian_reduction(#matrix{
 inner_column_hungarian_reduction(Column, Unit, Bin) ->
     BinMin = inner_min(Column, Unit, Bin),
     Size = Unit * Column,
-    <<<<(lib_bitstring:zipwith(fun (ValueA, ValueB) -> 
+    <<<<(lib_bitstring:zipwith(fun (ValueA, ValueB) ->
                                        ValueA - ValueB
-                               end, Unit, BinRow, BinMin))/bits>> 
+                               end, Unit, BinRow, BinMin))/bits>>
       || <<BinRow:Size/bits>> <= Bin>>.
 
 %% -spec inner_min_max_of_lists(list()) ->
@@ -451,7 +445,7 @@ inner_min(Column, Unit, BinMin, Bin) ->
     Size = Unit * Column,
     <<BinMin2:Size/bits, Tail/bits>> = Bin,
     inner_min(
-      Column, Unit, 
+      Column, Unit,
       lib_bitstring:zipwith(fun erlang:min/2, Unit, BinMin, BinMin2), Tail).
 
 -spec inner_min(Unit :: pos_integer(), BinData :: bitstring()) ->
@@ -478,7 +472,6 @@ inner_min2(Min, Unit, BinData) ->
 inner_index(RowIndex, ColumnIndex, Columns) ->
     (RowIndex - 1) * Columns + ColumnIndex - 1.
 
--include_lib("eunit/include/eunit.hrl").
 -spec inner_column_max(Current :: bitstring(),
                        Unit :: pos_integer(),
                        Size :: pos_integer(),

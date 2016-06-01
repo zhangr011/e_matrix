@@ -15,12 +15,6 @@
           %% for column: 4 row: 2 size: ?INT1
           %% <<0, 1, 0, 0, 1, 0, 0, 0>>
           data :: bitstring()
-          %% min_in_row :: bitstring(),           %% min of all rows
-          %% max_in_row :: bitstring(),           %% max of all rows
-          %% min_in_column :: bitstring(),        %% min of all columns
-          %% max_in_column :: bitstring(),        %% max of all columns
-          %% min :: pos_integer(),                %% min of the matrix
-          %% max :: pos_integer()                 %% max of the matrix
          }).
 
 -record(min_max_helper, {

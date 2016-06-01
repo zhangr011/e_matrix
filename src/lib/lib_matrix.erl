@@ -28,7 +28,8 @@
 
          hungarian_reduction/1,
 
-         column_max/1, column_max/2
+         column_max/1, column_max/2,
+         row_max/1, row_max/2
         ]).
 
 -include("define_matrix.hrl").
@@ -321,7 +322,7 @@ hungarian_reduction(_) ->
 %% @doc return the max of each column
 -spec column_max(Input :: bitstring(),
                  Matrix :: #matrix{}) ->
-                        #matrix{}.
+                        bitstring().
 column_max(Input, #matrix{
                      column = Columns,
                      unit = Unit,
@@ -331,13 +332,33 @@ column_max(Input, #matrix{
     inner_column_max(Input, Unit, Size, Data).
 
 -spec column_max(Matrix :: #matrix{}) ->
-                        #matrix{}.
+                        bitstring().
 column_max(#matrix{
               column = Columns,
               unit = Unit
              } = Matrix) ->
     Input = << <<Value:Unit>> || Value <- lists:duplicate(Columns, 0) >>,
     column_max(Input, Matrix).
+
+%% @doc return the max of each row
+-spec row_max(Input :: bitstring(), 
+              Matrix :: #matrix{}) ->
+                     bitstring().
+row_max(Input, #matrix{
+                  column = Columns,
+                  unit = Unit,
+                  data = Data
+                 }) ->
+    inner_row_max(Input, Unit, Unit * Columns, Data).
+
+-spec row_max(Matrix :: #matrix{}) ->
+                     bitstring().
+row_max(#matrix{
+           row = Rows,
+           unit = Unit
+          } = Matrix) ->
+    Input = << <<Value:Unit>> || Value <- lists:duplicate(Rows, 0) >>, 
+    row_max(Input, Matrix).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -531,6 +552,7 @@ inner_column_max(Current, Unit, Size, Bin) ->
       lib_bitstring:zipwith(fun erlang:max/2, Unit, Current, BinHead),
       Unit, Size, Tail).
 
+
 -spec for_each([{integer(), integer()}], fun((#matrix{}, integer(), integer()) -> #matrix{}),
     #matrix{}) -> #matrix{}.
 for_each([], _Fun, Matrix) -> Matrix;
@@ -546,3 +568,26 @@ swap(Matrix, I, J) ->
 -spec copy(#matrix{}, [{integer(), integer()}], #matrix{}) -> #matrix{}.
 copy(_First, [], Second) -> Second;
 copy(First, [{F, S} | T], Second) -> copy(First, T, set(S, F, Second, get(F, S, First))).
+
+-spec inner_row_max(Current :: bitstring(),
+                    Unit :: pos_integer(),
+                    Size :: pos_integer(),
+                    Data :: bitstring()) ->
+                           bitstring().
+inner_row_max(Current, Unit, Size, Bin) ->
+    inner_row_max(
+      fun (ValueCurrent, BinRow) ->
+              lib_bitstring:foldl(
+                fun (Value, In) ->
+                        max(Value, In)
+                end, ValueCurrent, Unit, BinRow)
+      end, Unit, Current, Size, Bin).
+
+inner_row_max(_, _, <<>>, _, <<>>) ->
+    <<>>;
+inner_row_max(Fun, Unit, BinCurrent, Size, Bin) ->
+    <<Current:Unit, TailCurrent/bits>> = BinCurrent,
+    <<BinRow:Size/bits, TailBin/bits>> = Bin,
+    <<(Fun(Current, BinRow)):Unit, 
+      (inner_row_max(Fun, Unit, TailCurrent, Size, TailBin))/bits>>.
+

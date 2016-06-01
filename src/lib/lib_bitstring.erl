@@ -9,12 +9,24 @@
 -module(lib_bitstring).
 
 %% API
--export([index/3, get/3, get_bits/3, update/4, 
+-export([index/3, get/3, get_bits/3, update/4, foldl/4,
          zipwith/4, zipwith/5, zipfoldl/6]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
+
+%% @doc get the max value
+-spec foldl(Fun :: fun((integer(), term()) -> term()),
+            Init :: term(),
+            Unit :: integer(),
+            Bin :: bitstring()) ->
+                   term().
+foldl(_, Value, _, <<>>) ->
+    Value;
+foldl(Fun, In, Unit, Bin) ->
+    <<Value:Unit, Tail/bits>> = Bin,
+    foldl(Fun, Fun(Value, In), Unit, Tail).
 
 %% @doc find the first index of target value
 -spec index(Value :: integer(), 

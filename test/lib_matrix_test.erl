@@ -192,11 +192,14 @@ hungarian_reduction_test_() ->
     [?_assertEqual(lib_matrix:hungarian_reduction(Init),
                    lib_matrix:new(4, 4, ?INT16, List2))].
 
-column_max_test_() ->
+column_max_and_row_max_test_() ->
     Init = lib_matrix:new(10, 5, ?INT16, lists:seq(1, 10 * 5)),
     List = lists:seq(46, 50),
+    List2 = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
     [?_assertEqual(<< <<V:?INT16>> || V <- List >>,
-                   lib_matrix:column_max(Init))].
+                   lib_matrix:column_max(Init)),
+     ?_assertEqual(<< <<V:?INT16>> || V <- List2 >>,
+                   lib_matrix:row_max(Init))].
 
 transpose_test_() ->
   First = lib_matrix:new(10, 5, ?INT16, lists:seq(1, 10 * 5)),

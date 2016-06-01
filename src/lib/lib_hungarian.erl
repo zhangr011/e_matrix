@@ -11,11 +11,14 @@
 %% API
 -export([hungarian/1]).
 
-%% -ifdef().
+-ifdef(TEST).
 
--export([inner_update_labels/1, inner_add_to_tree/3]).
+-export([init_labels/1,
+         inner_update_labels/1,
+         inner_init_param/2
+        ]).
 
-%% -endif.
+-endif.
 
 -include("define_hungarian.hrl").
 
@@ -51,7 +54,7 @@ init_labels(#hungarian_helper{
     Bin = << <<Value:?INT8>> || 
               Value <- lists:duplicate(Columns, ?MINUS_ONE)>>,
     Helper#hungarian_helper{
-      lx = lib_matrix:column_max(CostMatrix),
+      lx = lib_matrix:row_max(CostMatrix),
       ly = << <<Value:Unit>> || Value <- lists:duplicate(Columns, 0)>>,
       xy = Bin,
       yx = Bin
@@ -72,38 +75,21 @@ augment(#hungarian_helper{
            xy = BinXY
           } = Helper) ->
     ?debugMsg("augment"),
-    BinBoolInit = << <<V:?INT1>> || V <- lists:duplicate(Column, 0) >>,
-    BinPrevInit = 
-        << <<V:?INT8>> || V <- lists:duplicate(Column, ?MINUS_ONE) >>,
-    ResetHelper = 
-        Helper#hungarian_helper{
-          source = BinBoolInit,   %% init set source
-          target = BinBoolInit,   %% init set target
-          prev = BinPrevInit      %% init set prev - for the alternating tree
-         },
-    Queue = lib_wr_queue:new(?INT8, Column),
-    case lib_bitstring:index(?MINUS_ONE, ?INT8, BinXY) of
-        false ->
-            ignore;
-        IndexX ->
-            %% finding root of the tree
-            Root = IndexX,
-            UpdateQueue = lib_wr_queue:in(IndexX, Queue),
-            BinPrevUpdate = 
-                lib_bitstring:update(IndexX, ?INT8, -2, BinPrevInit),
-            BinSource = lib_bitstring:update(IndexX, ?INT1, 1, BinBoolInit),
-            %% initializing slack array
-            BinSlack = inner_init_slack(Root, BinLx, BinLy, Cost),
-            BinSlackX = << <<Value:?INT8>> || 
-                            Value <- lists:duplicate(Column, Root)>>,
-            inner_augment(ResetHelper#hungarian_helper{
-                            source = BinSource,
-                            slack = BinSlack,
-                            slackx = BinSlackX,
-                            prev = BinPrevUpdate,
-                            queue = UpdateQueue
-                           })
-    end.
+    {Root, Queue, BinPrev, BinSource, BinTarget} = 
+        inner_init_param(Column, BinXY),
+    %% initializing slack array
+    BinSlack = inner_init_slack(Root, BinLx, BinLy, Cost),
+    BinSlackX = << <<Value:?INT8>> || 
+                    Value <- lists:duplicate(Column, Root)>>,
+    inner_augment(Helper#hungarian_helper{
+                    source = BinSource,  %% init set source
+                    target = BinTarget,  %% init set target
+                    slack = BinSlack,
+                    slackx = BinSlackX,
+                    %% init set prev - for the alternating tree
+                    prev = BinPrev,
+                    queue = Queue
+                   }).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -114,6 +100,30 @@ augment(#hungarian_helper{
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+-spec inner_init_param(Column :: pos_integer(),
+                       BinXY :: bitstring()) ->
+                              {Root :: pos_integer(),
+                               Queue :: #wr_queue{},
+                               BinPrev :: bitstring(),
+                               BinSource :: bitstring(),
+                               BinTarget :: bitstring()}.
+inner_init_param(Column, BinXY) ->
+    BinBoolInit = << <<V:?INT1>> || V <- lists:duplicate(Column, 0) >>,
+    BinPrevInit = 
+        << <<V:?INT8>> || V <- lists:duplicate(Column, ?MINUS_ONE) >>,
+    Queue = lib_wr_queue:new(?INT8, Column),
+    case lib_bitstring:index(?MINUS_ONE, ?INT8, BinXY) of
+        false ->
+            {1, Queue, BinPrevInit, BinBoolInit, BinBoolInit};
+        IndexX ->
+            %% finding root of the tree
+            UpdateQueue = lib_wr_queue:in(IndexX, Queue),
+            BinPrevUpdate = 
+                lib_bitstring:update(IndexX, ?INT8, -2, BinPrevInit),
+            BinSource = lib_bitstring:update(IndexX, ?INT1, 1, BinBoolInit),
+            {IndexX, UpdateQueue, BinPrevUpdate, BinSource, BinBoolInit}
+    end.
 
 -spec inner_init_slack(Root :: pos_integer(),
                        BinLx :: bitstring(),

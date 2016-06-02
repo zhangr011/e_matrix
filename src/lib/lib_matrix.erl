@@ -10,6 +10,9 @@
 
 %% API
 -export([new/4,
+         ones/3,
+         zeros/3,
+         eye/3,
          is_square/1,
 
          get/3,
@@ -52,6 +55,40 @@ new(Row, Column, Unit, List) when Column * Row =:= length(List) ->
       };
 new(_, _, _, _) ->
     throw(error_bad_length).
+    
+-spec zeros(pos_integer(), pos_integer(), pos_integer()) ->
+  #matrix{}.
+zeros(Row,Column,Unit)->
+  #matrix{
+    column = Column,
+    row = Row,
+    unit = Unit,
+    data = <<<<D:Unit>> || D <- lists:duplicate(Row*Column,0)>>
+  }.
+
+-spec ones(pos_integer(), pos_integer(), pos_integer()) ->
+  #matrix{}.
+ones(Row,Column,Unit)->
+  #matrix{
+    column = Column,
+    row = Row,
+    unit = Unit,
+    data = <<<<D:Unit>> || D <- lists:duplicate(Row*Column,1)>>
+  }.
+
+-spec eye(pos_integer(), pos_integer(), pos_integer()) ->
+  #matrix{}.
+eye(Row,Column,Unit)->
+  List = [fun() -> case X =:= Y of
+                     true -> 1;
+                     false -> 0
+                   end end() || X <- lists:seq(1,Row), Y <- lists:seq(1,Column)],
+  #matrix{
+    column = Column,
+    row = Row,
+    unit = Unit,
+    data = <<<<D:Unit>> || D <- List>>
+  }.    
 
 %% @doc True if the matrix is square, false otherwise.
 -spec is_square(#matrix{}) -> boolean().
@@ -105,7 +142,6 @@ set(RowIndex, ColumnIndex, #matrix{
     unit = Unit,
     data = <<Pre/bits, Value:Unit, Suf/bits>>
   }.
-
 
 %% @doc Transpose of matrix
 -spec transpose(#matrix{}) -> #matrix{}.

@@ -98,6 +98,8 @@ add_mult_test_() ->
                                                 Id * 2
                                         end,
                                         lists:seq(1, 10 * 10))),
+    A = lib_matrix:new(2,3,8,lists:seq(1,6)),
+    B = lib_matrix:new(3,2,8,lists:seq(1,6)),
     [?_assertEqual(Init, #matrix{
                             column = 10,
                             row = 10,
@@ -114,9 +116,13 @@ add_mult_test_() ->
                                 I <- lists:seq(1000200,
                                                1000200 + 10 * 10 - 1)>>
                     }),
-     ?_assertEqual(lib_matrix:add(Init, Init), InitPlus),
-     ?_assertEqual(lib_matrix:mult(2, Init), InitPlus)
-    ].
+      ?_assertEqual(lib_matrix:add(Init, Init), InitPlus),
+      ?_assertEqual(lib_matrix:mult(2, Init), InitPlus),
+      ?_assertEqual(lib_matrix:mult(Init, 2), InitPlus),
+      ?_assertEqual(lib_matrix:mult(A,B),
+        lib_matrix:new(2,2,8,[22,28,49,64])),
+      ?_assertEqual(lib_matrix:mult(B,A),
+        lib_matrix:new(3,3,8,[9,12,15,19,26,33,29,40,51]))].
 
 insert_row_test_() ->
     List1 = lists:seq(1, 10 * 10),
@@ -208,6 +214,21 @@ transpose_test_() ->
   TSecond = lib_matrix:transpose(Second),
   [?_assertEqual(First,lib_matrix:transpose(TFirst)),
   ?_assertEqual(Second,lib_matrix:transpose(TSecond))].
+  
+ones_test_() ->
+  First = lib_matrix:ones(3, 2, ?INT8),
+  Second = lib_matrix:new(3, 2, ?INT8, lists:duplicate(6, 1)),
+  ?_assertEqual(First, Second).
+
+eye_test_() ->
+  First = lib_matrix:eye(3, 2, ?INT8),
+  Second = lib_matrix:new(3, 2, ?INT8, [1, 0, 0, 1, 0, 0]),
+  ?_assertEqual(First, Second).
+
+zeros_test_() ->
+  First = lib_matrix:zeros(3, 2, ?INT8),
+  Second = lib_matrix:new(3, 2, ?INT8, lists:duplicate(6, 0)),
+  ?_assertEqual(First, Second).  
 
 %% ============================== for inner ==============================
 

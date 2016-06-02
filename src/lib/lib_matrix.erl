@@ -227,9 +227,11 @@ add(_, _) ->
 
 %% @doc mult for matrix
 -spec mult(integer(), #matrix{}) ->
-                  #matrix{};
-          (#matrix{}, #matrix{}) ->
-                  #matrix{}.
+  #matrix{};
+    (#matrix{}, integer()) ->
+  #matrix{};
+    (#matrix{}, #matrix{}) ->
+  #matrix{}.
 mult(Scalar, #matrix{
                 unit = Unit,
                 data = Original
@@ -237,18 +239,13 @@ mult(Scalar, #matrix{
     Matrix#matrix{
       data = <<<<(X * Scalar):Unit>> || <<X:Unit>> <= Original>>
      };
-mult(#matrix{
-        %% column = Columns,
-        %% row = Fixed,
-        %% unit = Unit,
-        %% data = BinA
-       }, #matrix{
-             %% column = Fixed,
-             %% row = Rows,
-             %% unit = Unit,
-             %% data = BinB
-            }) ->
-    <<>>;
+mult(#matrix{}=Matrix,Scalar) when is_integer(Scalar)->
+  mult(Scalar,Matrix);
+mult(#matrix{column = Columns}, #matrix{row = Rows})  when Rows =/= Columns ->
+  throw(incorrect_matrix);
+mult(#matrix{row = Rows}= A, #matrix{column = Columns} = B)->
+  Index = [{X, Y} || X <- lists:seq(1, Rows), Y <- lists:seq(1, Columns)],
+  mult(A,B,Index,zeros(Rows,Rows,A#matrix.unit));
 mult(_, _) ->
     throw(not_match_matrix).
 
@@ -604,6 +601,21 @@ swap(Matrix, I, J) ->
 -spec copy(#matrix{}, [{integer(), integer()}], #matrix{}) -> #matrix{}.
 copy(_First, [], Second) -> Second;
 copy(First, [{F, S} | T], Second) -> copy(First, T, set(S, F, Second, get(F, S, First))).
+
+-spec mult(#matrix{}, #matrix{}, [{pos_integer(), pos_integer()}], #matrix{}) ->
+  #matrix{}.
+mult(_,_,[],New)->New;
+mult(A, B,[{F,S}|T],New)->
+  Value = scalar_productIJ(A,B,{F,S},0,A#matrix.column,0),
+  mult(A,B,T,set(F,S,New,Value)).
+
+-spec scalar_productIJ(#matrix{}, #matrix{}, [{pos_integer(), pos_integer()}],
+    pos_integer(), pos_integer(),integer()) -> 
+    #matrix{}.
+scalar_productIJ(_,_,_,Iter,End,R) when Iter =:= End ->R;
+scalar_productIJ(A,B,{I,J},N,End,Old)->
+  New = Old + get(I,N+1,A)*get(N+1,J,B),
+  scalar_productIJ(A,B,{I,J},N+1,End,New).
 
 -spec inner_row_max(Current :: bitstring(),
                     Unit :: pos_integer(),

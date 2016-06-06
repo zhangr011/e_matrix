@@ -229,6 +229,11 @@ zeros_test_() ->
   First = lib_matrix:zeros(3, 2, ?INT8),
   Second = lib_matrix:new(3, 2, ?INT8, lists:duplicate(6, 0)),
   ?_assertEqual(First, Second).  
+  
+elwise_mult_test_() ->
+  First = lib_matrix:new(3, 3, 9, lists:seq(1, 9)),
+  Second = lib_matrix:new(3, 3, 9, [fun() -> X * X end() || X <- lists:seq(1, 9)]),
+  ?_assertEqual(lib_matrix:elwise_mult(First, First), Second). 
 
 %% ============================== for inner ==============================
 

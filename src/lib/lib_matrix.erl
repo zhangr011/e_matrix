@@ -22,6 +22,7 @@
 
          add/2,
          mult/2,
+         elwise_mult/2,
          all/2,
          zipwith/3,
 
@@ -248,6 +249,30 @@ mult(#matrix{row = Rows}= A, #matrix{column = Columns} = B)->
   mult(A,B,Index,zeros(Rows,Rows,A#matrix.unit));
 mult(_, _) ->
     throw(not_match_matrix).
+
+%% @doc function multiplies matrix A and B element by element
+-spec elwise_mult(integer(), #matrix{}) ->
+  #matrix{};
+    (#matrix{}, integer()) ->
+  #matrix{};
+    (#matrix{}, #matrix{}) ->
+  #matrix{}.
+elwise_mult(Scalar, #matrix{} = Matrix) when is_integer(Scalar) ->
+  mult(Scalar, Matrix);
+elwise_mult(#matrix{} = Matrix, Scalar) when is_integer(Scalar) ->
+  mult(Scalar, Matrix);
+elwise_mult(#matrix{row = Rows, column = Columns, data = Adata},
+    #matrix{row = Rows, column = Columns, unit = Unit, data = Bdata}) ->
+  #matrix{
+    row = Rows,
+    column = Columns,
+    unit = Unit,
+    data = <<<<D:Unit>> || D <-product(Adata, Bdata, Unit, Rows * Columns)>>
+  };
+elwise_mult(#matrix{}, #matrix{}) ->
+  throw(incorrect_matrix);
+elwise_mult(_, _) ->
+  throw(not_match_matrix).
 
 %% @doc
 -spec all(fun ((integer()) -> boolean()),
@@ -616,6 +641,14 @@ scalar_productIJ(_,_,_,Iter,End,R) when Iter =:= End ->R;
 scalar_productIJ(A,B,{I,J},N,End,Old)->
   New = Old + get(I,N+1,A)*get(N+1,J,B),
   scalar_productIJ(A,B,{I,J},N+1,End,New).
+  
+-spec product(bitstring(), bitstring(), pos_integer(), pos_integer()) -> [pos_integer()].
+product(A, B, Unit, Length) ->
+  [fun() ->
+    Size = X * Unit,
+    <<_:Size/bits, ValueA:Unit, _/bits>> = A,
+    <<_:Size/bits, ValueB:Unit, _/bits>> = B,
+    ValueA * ValueB end() || X <- lists:seq(0, Length - 1)].  
 
 -spec inner_row_max(Current :: bitstring(),
                     Unit :: pos_integer(),

@@ -15,7 +15,9 @@
 
 -export([init_labels/1,
          inner_update_labels/1,
-         inner_init_param/2
+         inner_augment_pre/1,
+         inner_build_bfs_tree/1,
+         inner_check_runtimes/0
         ]).
 
 -endif.
@@ -65,31 +67,12 @@ augment(#hungarian_helper{
            max_match = Same
           } = Helper) ->
     %% matching is already perfect
+    %% ?debugMsg("augment"),
     Helper;
-augment(#hungarian_helper{
-           cost = #matrix{
-                     column = Column
-                    } = Cost,
-           lx = BinLx,
-           ly = BinLy,
-           xy = BinXY
-          } = Helper) ->
-    ?debugMsg("augment"),
-    {Root, Queue, BinPrev, BinSource, BinTarget} = 
-        inner_init_param(Column, BinXY),
-    %% initializing slack array
-    BinSlack = inner_init_slack(Root, BinLx, BinLy, Cost),
-    BinSlackX = << <<Value:?INT8>> || 
-                    Value <- lists:duplicate(Column, Root)>>,
-    inner_augment(Helper#hungarian_helper{
-                    source = BinSource,  %% init set source
-                    target = BinTarget,  %% init set target
-                    slack = BinSlack,
-                    slackx = BinSlackX,
-                    %% init set prev - for the alternating tree
-                    prev = BinPrev,
-                    queue = Queue
-                   }).
+augment(Helper) ->
+    %% ?debugMsg("augment"),
+    PreHelper = inner_augment_pre(Helper),
+    inner_augment(PreHelper).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -100,6 +83,36 @@ augment(#hungarian_helper{
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+-spec inner_augment_pre(Helper :: #hungarian_helper{}) ->
+                               PreHelper :: #hungarian_helper{}.
+inner_augment_pre(#hungarian_helper{
+                     cost = #matrix{
+                               column = Column
+                              } = Cost,
+                     lx = BinLx,
+                     ly = BinLy,
+                     xy = BinXY
+                    } = Helper) ->
+    {Root, Queue, BinPrev, BinSource, BinTarget} = 
+        inner_init_param(Column, BinXY),
+    %% initializing slack array
+    BinSlack = inner_init_slack(Root, BinLx, BinLy, Cost),
+    BinSlackX = << <<Value:?INT8>> || 
+                    Value <- lists:duplicate(Column, Root)>>,
+    %% ?debugFmt("S: ~p", [BinSource]),
+    %% ?debugFmt("slack: ~p", [BinSlack]),
+    %% ?debugFmt("slackx: ~p", [BinSlackX]),
+    %% ?debugFmt("lx: ~p", [BinLx]),
+    Helper#hungarian_helper{
+      source = BinSource,  %% init set source
+      target = BinTarget,  %% init set target
+      slack = BinSlack,
+      slackx = BinSlackX,
+      %% init set prev - for the alternating tree
+      prev = BinPrev,
+      queue = Queue
+     }.
 
 -spec inner_init_param(Column :: pos_integer(),
                        BinXY :: bitstring()) ->
@@ -153,44 +166,38 @@ inner_update_labels(#hungarian_helper{
                       } = Helper) ->
     %% calculate delta using slack
     Delta = lib_bitstring:zipfoldl(
-              fun (ValueTarget, ValueSlack, InDelta) ->
-                      if
-                          ValueTarget =:= 0 ->
-                              min(InDelta, ValueSlack);
-                          true ->
-                              InDelta
-                      end
+              fun (0, ValueSlack, InDelta) ->
+                      min(InDelta, ValueSlack);
+                  (_ValueTarget, _ValueSlack, InDelta) ->
+                      InDelta
               end, undefined, ?INT1, BinTarget, Unit, BinSlack),
     %% update X labels
     NewBinLx = lib_bitstring:zipwith(
-                 fun (ValueSource, ValueLx) ->
-                         if
-                             ValueSource =:= 1 ->
-                                 ValueLx - Delta;
-                             true -> 
-                                 ValueLx
-                         end
+                 fun (1, ValueLx) ->
+                         ValueLx - Delta;
+                     (_ValueSource, ValueLx) -> 
+                         ValueLx
                  end, ?INT1, BinSource, Unit, BinLx),
     %% update Y labels
     NewBinLy = lib_bitstring:zipwith(
-                 fun (ValueTarget, ValueLy) ->
-                         if
-                             ValueTarget =:= 1 ->
-                                 ValueLy + Delta;
-                             true ->
-                                 ValueLy
-                         end
+                 fun (1, ValueLy) ->
+                         ValueLy + Delta;
+                     (_ValueTarget, ValueLy) ->
+                         ValueLy
                  end, ?INT1, BinTarget, Unit, BinLy),
     %% update slack 
     NewBinSlack = lib_bitstring:zipwith(
-                    fun (ValueTarget, ValueSlack) ->  
-                            if
-                                ValueTarget =:= 0 ->
-                                    ValueSlack - Delta;
-                                true ->
-                                    ValueSlack
-                            end
+                    fun (0, ValueSlack) ->  
+                            ValueSlack - Delta;
+                        (_ValueTarget, ValueSlack) ->
+                            ValueSlack
                     end, ?INT1, BinTarget, Unit, BinSlack),
+    %% ?debugFmt("update labels lx pre: ~p", [BinLx]),
+    %% ?debugFmt("delta: ~p", [Delta]),
+    %% ?debugFmt("S: ~p", [BinSource]),
+    %% ?debugFmt("T: ~p", [BinTarget]),
+    %% ?debugFmt("update labels lx: ~p", [NewBinLx]),
+    %% ?debugFmt("update labels ly: ~p", [NewBinLy]),
     Helper#hungarian_helper{
       lx = NewBinLx,
       ly = NewBinLy,
@@ -240,6 +247,10 @@ inner_add_to_tree(X, PrevX, #hungarian_helper{
                           InAcc
                   end
           end, {BinSlack, BinSlackX}, lists:seq(1, Columns)),
+    %% ?debugFmt("add to tree S: ~p", [NewBinSource]),
+    %% ?debugFmt("add to tree prev: ~p", [NewBinPrev]),
+    %% ?debugFmt("add to tree slack: ~p", [NewBinSlack]),
+    %% ?debugFmt("add to tree slackx: ~p", [NewBinSlackx]),
     Helper#hungarian_helper{
       source = NewBinSource,
       slack = NewBinSlack,
@@ -250,6 +261,7 @@ inner_add_to_tree(X, PrevX, #hungarian_helper{
 -spec inner_augment(#hungarian_helper{}) ->
                            #hungarian_helper{}.
 inner_augment(Helper) ->
+    %% inner_check_runtimes(),
     case inner_build_bfs_tree(Helper) of
         {break, X, Y, NewHelper} ->
             inner_augment_found(X, Y, NewHelper);
@@ -314,7 +326,7 @@ inner_augment_advance(#hungarian_helper{
                            Helper :: #hungarian_helper{}) ->
                                   {break, pos_integer()} |
                                   {ok, #hungarian_helper{}}.
-inner_iter_all_edges(Same, Same, _, _, _, Helper) ->
+inner_iter_all_edges(Index, Max, _, _, _, Helper) when Index > Max ->
     {ok, Helper};
 inner_iter_all_edges(Index, Max, Unit, BinCostX, X, #hungarian_helper{
                                                        target = BinTarget,
@@ -323,11 +335,12 @@ inner_iter_all_edges(Index, Max, Unit, BinCostX, X, #hungarian_helper{
                                                        yx = BinYX,
                                                        queue = Queue
                                                       } = Helper) ->
-    ?debugMsg("inner_iter_all_edges"),
     ValueCostXY = lib_bitstring:get(Index, Unit, BinCostX),
-    ValueLx = lib_bitstring:get(Index, Unit, BinLx),
+    ValueLx = lib_bitstring:get(X, Unit, BinLx),
     ValueLy = lib_bitstring:get(Index, Unit, BinLy),
     ValueTarget = lib_bitstring:get(Index, ?INT1, BinTarget),
+    %% ?debugFmt("x: ~p, y: ~p, cost: ~p, lx: ~p, ly: ~p, ty: ~p", 
+    %%           [X, Index, ValueCostXY, ValueLx, ValueLy, ValueTarget]),
     if
         ValueCostXY =:= ValueLx + ValueLy,
         ValueTarget =:= 0 ->
@@ -345,7 +358,6 @@ inner_iter_all_edges(Index, Max, Unit, BinCostX, X, #hungarian_helper{
                     %% add vertex yx[y],which is matched with y, to the queue
                     NewQueue = lib_wr_queue:in(ValueYx, Queue),
                     %% add edges (x, y) and (y, yx[y]) to the tree
-                    ?debugFmt("~p, ~p ~n", [ValueYx, X]),
                     AddTreeHelper = 
                         inner_add_to_tree(ValueYx, X, 
                                           Helper#hungarian_helper{
@@ -368,7 +380,7 @@ inner_iter_all_edges(Index, Max, Unit, BinCostX, X, #hungarian_helper{
                                 Helper :: #hungarian_helper{}) ->
                                        {break, pos_integer(), pos_integer()}|
                                        {ok, #hungarian_helper{}}.
-inner_iter_equality_graph(Same, Same, Helper) ->
+inner_iter_equality_graph(Index, Max, Helper) when Index > Max ->
     {ok, Helper};
 inner_iter_equality_graph(Index, Max, #hungarian_helper{
                                          cost = #matrix{
@@ -381,7 +393,7 @@ inner_iter_equality_graph(Index, Max, #hungarian_helper{
                                          slackx = BinSlackX,
                                          queue = Queue
                                         } = Helper) ->
-    ?debugFmt("inner_iter_equality_graph: ~p, ~p~n", [Index, Max]),
+    %% ?debugFmt("inner_iter_equality_graph: ~p, ~p", [Index, Max]),
     ValueTarget = lib_bitstring:get(Index, ?INT1, BinTarget),
     ValueSlack = lib_bitstring:get(Index, Unit, BinSlack),
     if
@@ -454,10 +466,26 @@ inner_inverse_edges(Cx, Cy, BinXY, BinYX, BinPrev) ->
     BinIndex = lib_bitstring:get_bits(Cx, ?INT8, BinPrev),
     if
         BinIndex =:= ?BIN_MINUS_TWO_INT8 ->
+            %% ?debugFmt("cycle xy: ~p", [NewBinXY]),
+            %% ?debugFmt("cycle yx: ~p", [NewBinYX]),
             {NewBinXY, NewBinYX};
         true ->
             <<Cx2:?INT8>> = BinIndex,
             Ty = lib_bitstring:get(Cx, ?INT8, BinXY),
             inner_inverse_edges(Cx2, Ty, NewBinXY, NewBinYX, BinPrev)
+    end.
+
+inner_check_runtimes() ->
+    Times = case get(augment_rum_times) of
+                undefined ->
+                    1;
+                Num ->
+                    Num + 1
+            end,
+    if
+        Times > 5 ->
+            throw(times_out);
+        true ->
+            put(augment_rum_times, Times)
     end.
 

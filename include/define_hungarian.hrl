@@ -4,7 +4,7 @@
 -include("define_matrix.hrl").
 -include("define_queue.hrl").
 
--define(N, 55).                    %% max number of vertices
+%% -define(N, 55).                    %% max number of vertices
 -define(MINUS_ONE,  -1).
 
 -define(BIN_MINUS_ONE_INT8, <<-1:?INT8>>).
